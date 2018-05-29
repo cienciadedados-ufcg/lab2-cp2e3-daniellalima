@@ -1,0 +1,133 @@
+---
+title: "Prob2CP3"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+library(tidyverse)
+library(here)
+library(plotly)
+theme_set(theme_bw())
+```
+
+```{r}
+respostas = read_csv(here::here("data/respostas-merepresenta-2016.csv"), 
+                     col_types = cols(.default = col_character(), 
+                                      nota_partido = col_integer(), 
+                                      votos_recebidos = col_integer()))
+```
+
+Para esta análise foram utilizados dados disponíveis em https://github.com/cienciadedados-ufcg/vis-merepresenta.
+
+##Qual a proporção de candidatos que defedem a descriminalização do aborto?
+
+O questionamento acima pode ser facilmente respondido através de um gráfico de setores, como o que segue:
+
+```{r}
+respostas_ab = 
+    respostas %>% 
+    gather(key = "tema", 
+           value = "resposta", 
+           17)
+
+colors <- c("#f95454", "#6eef6e")
+
+plot_ly() %>%
+  add_pie(data = count(respostas_ab, resposta), labels = ~resposta, values = ~n, textposition = 'inside', textinfo = 'label+percent', insidetextfont = list(color = '#FFFFFF', size = 15), marker = list(colors = colors, line = list(color = '#FFFFFF', width = 1))) %>%
+  layout(title = "Apoio à descriminalização do aborto")
+
+```
+
+Ao colocar o cursor sobre o gráfico é possível ver, além da porcentagem, o total de candidatos contrários ou favoráveis ao assunto. Para investigar melhor esse tema, vejamos a seguinte questão:
+
+###Os candidatos que defendem a descriminalização do aborto são em maioria homens ou mulheres?
+
+Através do gráfico de barras agrupadas abaixo podemos ver que homens e mulheres são, em sua maioria, favoráveis à descriminalização do aborto. No entanto, a porcentagem de mulheres que apoiam esse tema é levemente superior.
+
+```{r, warning=FALSE, message=FALSE}
+apoiam_ab = 
+    respostas_ab %>% 
+    group_by(genero) %>% 
+    summarise(apoio = sum(resposta == "S") / n(), n_apoio = sum(resposta == "N") / n())
+
+plot_ly(apoiam_ab, x = ~genero , y = ~apoio, type = 'bar', name = 'Favorável') %>%
+  add_trace(y = ~n_apoio, name = 'Contrário') %>%
+  layout(title = "Apoio à descriminalização do aborto por gênero",
+         xaxis = list(title = "Gênero"),
+         yaxis = list(title = '', tickformat = "%"), barmode = 'group')
+
+
+```
+
+##Como se dá o apoio nos estados do Nordeste à ações afirmativas raciais?
+
+```{r}
+respostas_rac = 
+    respostas %>% 
+    gather(key = "tema", 
+           value = "resposta", 
+           14)
+por_est = 
+    respostas_rac %>% 
+    group_by(sigla_estado) %>% 
+    summarise(apoio = sum(resposta == "S") / n())
+
+estadosNE = por_est %>% filter(sigla_estado %in% c("PB", "PE", "BA", "SE", "MA", "AL", "CE", "RN", "PI"))
+
+plot_ly(estadosNE, x = ~apoio, y = ~reorder(sigla_estado, apoio),
+              type = 'bar', orientation = 'h',
+              marker = list(color = '#2eba63')) %>%
+  layout(title = "Apoio à ações afirmativas raciais no Nordeste",
+         yaxis = list(title = "Estado", showgrid = FALSE, showline = FALSE, showticklabels = TRUE, domain= c(0, 0.85)),
+         xaxis = list(title = "", zeroline = FALSE, showline = FALSE, showticklabels = TRUE, showgrid = TRUE, tickformat = "%"))
+
+```
+
+O gráfico de barras acima foi ordenado de acordo com a taxa de apoio ao tema em questão (dos estados com maior apoio para os com menor), visando facilitar a visualização. Aqui vemos que quatro estados (SE, RN, PI, MA) não apresentaram candidatos que se declararam contrários ao tema. Já o estado de Alagoas apresentou a maior taxa de candidatos não favoráveis à pauta.
+
+Como a pergunta trata de ações afirmativas raciais, vejamos a qual raça pertencem os candidatos que se declararam contrários ao tema:
+
+###Qual a porcentagem de candidatos contrários às ações afirmativas raciais no Nordeste de acordo com a raça?
+
+Para visualizar a raça dos candidatos foi utilizado um esquema de cores.
+
+```{r}
+respostas_rac = 
+    respostas %>% 
+    gather(key = "tema", 
+           value = "resposta", 
+           14)
+
+estadosNErac = respostas_rac %>% filter(sigla_estado %in% c("PB", "PE", "BA", "SE", "MA", "AL", "CE", "RN", "PI"))
+
+counts = count(estadosNErac, sigla_estado)
+
+newtable <- merge(estadosNErac,counts, by  = "sigla_estado") 
+
+por_rac = 
+    newtable %>% 
+    group_by(sigla_estado, cor_tse) %>% 
+    summarise(apoio = sum(resposta == "S") / max(n), n_apoio = sum(resposta == "N") / max(n))
+
+yform <- list(title = "Estados",
+              categoryorder = "array",
+              categoryarray = c("AL", 
+                                "BA", 
+                                "PE",
+                                "CE",
+                                "PB",
+                                "MA",
+                                "PI",
+                                "RN",
+                                "SE"))
+
+plot_ly(por_rac, x = ~n_apoio, y = ~sigla_estado, type = 'bar', orientation = 'h', color = ~cor_tse) %>%
+  layout(title = "Raça dos candidatos contrários à ações afirmativas raciais no Nordeste",
+         barmode = 'stack',
+         xaxis = list(title ="Porcentagem de candidatos contrários", tickformat = "%"),
+         yaxis = yform)
+```
